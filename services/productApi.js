@@ -1,17 +1,32 @@
 import api from '@/lib/axios';
 
-// Get paginated products with optional AbortSignal
-export const getProducts = async (limit = 10, skip = 0, signal) => {
-  const response = await api.get(`/products?limit=${limit}&skip=${skip}`, { signal });
+// Get paginated products with optional sorting and AbortSignal
+export const getProducts = async (limit = 10, skip = 0, sortBy = '', order = '', signal) => {
+  let url = `/products?limit=${limit}&skip=${skip}`;
+  if (sortBy && order) {
+    url += `&sortBy=${sortBy}&order=${order}`;
+  }
+  const response = await api.get(url, { signal });
   return response.data;
 };
 
-// Search products by keyword with optional AbortSignal
-export const searchProducts = async (query, limit = 10, skip = 0, signal) => {
-  const response = await api.get(
-    `/products/search?q=${encodeURIComponent(query)}&limit=${limit}&skip=${skip}`,
-    { signal }
-  );
+// Search products by keyword with optional sorting and AbortSignal
+export const searchProducts = async (query, limit = 10, skip = 0, sortBy = '', order = '', signal) => {
+  let url = `/products/search?q=${encodeURIComponent(query)}&limit=${limit}&skip=${skip}`;
+  if (sortBy && order) {
+    url += `&sortBy=${sortBy}&order=${order}`;
+  }
+  const response = await api.get(url, { signal });
+  return response.data;
+};
+
+// Get products by specific category with optional sorting and AbortSignal
+export const getProductsByCategory = async (category, limit = 10, skip = 0, sortBy = '', order = '', signal) => {
+  let url = `/products/category/${encodeURIComponent(category)}?limit=${limit}&skip=${skip}`;
+  if (sortBy && order) {
+    url += `&sortBy=${sortBy}&order=${order}`;
+  }
+  const response = await api.get(url, { signal });
   return response.data;
 };
 
