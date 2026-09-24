@@ -2,8 +2,14 @@
 
 import { useEffect, useState, useCallback, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import axios from 'axios';
-import { getProducts, searchProducts, getProductsByCategory } from '@/services/productApi';
+import {
+  getProducts,
+  searchProducts,
+  getProductsByCategory,
+  deleteProduct,
+} from '@/services/productApi';
 import ProductTable from '@/components/ProductTable';
 import Pagination from '@/components/Pagination';
 import SearchBar from '@/components/SearchBar';
@@ -38,6 +44,10 @@ function ProductsContent() {
   const [totalItems, setTotalItems] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // State to track deletion status and feedback
+  const [deletingId, setDeletingId] = useState(null);
+  const [actionFeedback, setActionFeedback] = useState(null);
 
   const abortControllerRef = useRef(null);
 
@@ -123,6 +133,70 @@ function ProductsContent() {
     };
   }, [router, fetchProducts]);
 
+  // Handle product deletion
+  // const handleDeleteProduct = async (id) => {
+  //   if (deletingId) return; // Guard against multiple rapid requests
+
+  //   setDeletingId(id);
+  //   setActionFeedback(null);
+
+  //   try {
+  //     await deleteProduct(id);
+
+  //     // Remove deleted item locally from state
+  //     setProducts((prev) => prev.filter((item) => item.id !== id));
+  //     setTotalItems((prev) => Math.max(0, prev - 1));
+
+  //     setActionFeedback({
+  //       type: 'success',
+  //       message: `Product #${id} deleted successfully (simulated).`,
+  //     });
+  //   } catch (err) {
+  //     setActionFeedback({
+  //       type: 'error',
+  //       message: err.response?.data?.message || `Failed to delete product #${id}.`,
+  //     });
+  //   } finally {
+  //     setDeletingId(null);
+  //   }
+  // };
+
+    // Optimistic Delete Handler
+  const handleDeleteProduct = async (id) => {
+    if (deletingId) return; // Guard against multiple rapid clicks
+
+  // 1. Find and save product backup in case of network error
+    const productToDelete = products.find((p) => p.id === id);
+    if (!productToDelete) return;
+
+  // 2. OPTIMISTIC UPDATE: Remove item from UI state IMMEDIATELY
+    setProducts((prev) => prev.filter((item) => item.id !== id));
+    setTotalItems((prev) => Math.max(0, prev - 1));
+    setDeletingId(id);
+    setActionFeedback(null);
+
+    try {
+    // 3. Perform network call in background
+      await deleteProduct(id);
+
+      setActionFeedback({
+        type: 'success',
+        message: `Product #${id} deleted successfully.`,
+      });
+    } catch (err) {
+    // 4. ROLLBACK: Reinsert product into list if API fails
+      setProducts((prev) => [productToDelete, ...prev]);
+      setTotalItems((prev) => prev + 1);
+
+      setActionFeedback({
+        type: 'error',
+        message: err.response?.data?.message || `Failed to delete product #${id}. Restored to list.`,
+      });
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const updateQueryParams = (newPage, newPageSize, newSearch, newCategory, newSortBy, newOrder) => {
     const params = new URLSearchParams();
     params.set('page', newPage.toString());
@@ -154,7 +228,6 @@ function ProductsContent() {
   };
 
   const handleSortChange = (newSortBy, newOrder) => {
-    // Changing sort resets page to 1
     updateQueryParams(1, pageSize, searchQuery, categoryQuery, newSortBy, newOrder);
   };
 
@@ -168,7 +241,34 @@ function ProductsContent() {
 
   return (
     <div className="max-w-7xl mx-auto p-6">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Product Management</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Product Management</h1>
+        <Link
+          href="/products/add"
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+        >
+          + Add Product
+        </Link>
+      </div>
+
+      {/* Action Alert Banner */}
+      {actionFeedback && (
+        <div
+          className={`mb-4 p-4 rounded-lg text-sm flex justify-between items-center ${
+            actionFeedback.type === 'success'
+              ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+              : 'bg-red-50 text-red-800 border border-red-200'
+          }`}
+        >
+          <span>{actionFeedback.message}</span>
+          <button
+            onClick={() => setActionFeedback(null)}
+            className="text-xs font-bold underline ml-4"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <SearchBar initialValue={searchQuery} onSearch={handleSearch} delay={500} />
@@ -187,7 +287,11 @@ function ProductsContent() {
 
       {!loading && !error && (
         <>
-          <ProductTable products={products} />
+          <ProductTable
+            products={products}
+            onDelete={handleDeleteProduct}
+            deletingId={deletingId}
+          />
           <Pagination
             currentPage={currentPage}
             pageSize={pageSize}

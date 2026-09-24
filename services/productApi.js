@@ -1,60 +1,97 @@
 import api from '@/lib/axios';
 
-// 1. Get paginated products with optional sorting and AbortSignal
+// Simple in-memory cache map
+const apiCache = new Map();
+
+// Helper to check and return cached data or execute network call
+const fetchWithCache = async (cacheKey, apiCallFn) => {
+  if (apiCache.has(cacheKey)) {
+    return apiCache.get(cacheKey);
+  }
+
+  const data = await apiCallFn();
+  apiCache.set(cacheKey, data);
+  return data;
+};
+
+// 1. Get paginated products with optional sorting and caching
 export const getProducts = async (limit = 10, skip = 0, sortBy = '', order = '', signal) => {
-  let url = `/products?limit=${limit}&skip=${skip}`;
-  if (sortBy && order) {
-    url += `&sortBy=${sortBy}&order=${order}`;
-  }
-  const response = await api.get(url, { signal });
-  return response.data;
+  const cacheKey = `products_${limit}_${skip}_${sortBy}_${order}`;
+  
+  return fetchWithCache(cacheKey, async () => {
+    let url = `/products?limit=${limit}&skip=${skip}`;
+    if (sortBy && order) {
+      url += `&sortBy=${sortBy}&order=${order}`;
+    }
+    const response = await api.get(url, { signal });
+    return response.data;
+  });
 };
 
-// 2. Search products by keyword with optional sorting and AbortSignal
+// 2. Search products with caching
 export const searchProducts = async (query, limit = 10, skip = 0, sortBy = '', order = '', signal) => {
-  let url = `/products/search?q=${encodeURIComponent(query)}&limit=${limit}&skip=${skip}`;
-  if (sortBy && order) {
-    url += `&sortBy=${sortBy}&order=${order}`;
-  }
-  const response = await api.get(url, { signal });
-  return response.data;
+  const cacheKey = `search_${query}_${limit}_${skip}_${sortBy}_${order}`;
+
+  return fetchWithCache(cacheKey, async () => {
+    let url = `/products/search?q=${encodeURIComponent(query)}&limit=${limit}&skip=${skip}`;
+    if (sortBy && order) {
+      url += `&sortBy=${sortBy}&order=${order}`;
+    }
+    const response = await api.get(url, { signal });
+    return response.data;
+  });
 };
 
-// 3. Get products by specific category with optional sorting and AbortSignal
+// 3. Get products by category with caching
 export const getProductsByCategory = async (category, limit = 10, skip = 0, sortBy = '', order = '', signal) => {
-  let url = `/products/category/${encodeURIComponent(category)}?limit=${limit}&skip=${skip}`;
-  if (sortBy && order) {
-    url += `&sortBy=${sortBy}&order=${order}`;
-  }
-  const response = await api.get(url, { signal });
-  return response.data;
+  const cacheKey = `cat_${category}_${limit}_${skip}_${sortBy}_${order}`;
+
+  return fetchWithCache(cacheKey, async () => {
+    let url = `/products/category/${encodeURIComponent(category)}?limit=${limit}&skip=${skip}`;
+    if (sortBy && order) {
+      url += `&sortBy=${sortBy}&order=${order}`;
+    }
+    const response = await api.get(url, { signal });
+    return response.data;
+  });
 };
 
-// 4. Get all product categories
+// 4. Get categories with caching
 export const getCategories = async () => {
-  const response = await api.get('/products/categories');
-  return response.data;
+  return fetchWithCache('categories', async () => {
+    const response = await api.get('/products/categories');
+    return response.data;
+  });
 };
 
-// 5. Get a single product by ID with optional AbortSignal
+// 5. Get product by ID
 export const getProductById = async (id, signal) => {
-  const response = await api.get(`/products/${encodeURIComponent(id)}`, { signal });
-  return response.data;
+  const cacheKey = `product_${id}`;
+  return fetchWithCache(cacheKey, async () => {
+    const response = await api.get(`/products/${encodeURIComponent(id)}`, { signal });
+    return response.data;
+  });
 };
 
-// 6. Add a new product
+// Clear cache helper when adding/editing/deleting so fresh data is fetched next time
+export const clearProductCache = () => {
+  apiCache.clear();
+};
+
 export const addProduct = async (productData) => {
+  clearProductCache();
   const response = await api.post('/products/add', productData);
   return response.data;
 };
 
-// 7. Update an existing product by ID
-export const updateProduct = async (id, productData, signal) => {
-  const response = await api.put(`/products/${encodeURIComponent(id)}`, productData, { signal });
+export const updateProduct = async (id, productData) => {
+  clearProductCache();
+  const response = await api.put(`/products/${id}`, productData);
   return response.data;
 };
-// 8. Delete a product by ID
+
 export const deleteProduct = async (id) => {
+  clearProductCache();
   const response = await api.delete(`/products/${id}`);
   return response.data;
 };
