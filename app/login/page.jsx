@@ -46,6 +46,7 @@ export default function LoginPage() {
           onChange={(e) => setUsername(e.target.value)}
           className="w-full border rounded px-3 py-2 mb-3"
           required
+          suppressHydrationWarning
         />
 
         <label className="block text-sm text-gray-600 mb-1">Password</label>
@@ -55,6 +56,7 @@ export default function LoginPage() {
           onChange={(e) => setPassword(e.target.value)}
           className="w-full border rounded px-3 py-2 mb-3"
           required
+          suppressHydrationWarning
         />
 
         {error && <p className="text-red-600 text-sm mb-3">{error}</p>}
@@ -63,6 +65,7 @@ export default function LoginPage() {
           type="submit"
           disabled={isLoading}
           className="w-full bg-blue-600 text-white py-2 rounded disabled:opacity-50"
+          suppressHydrationWarning
         >
           {isLoading ? "Logging in..." : "Login"}
         </button>
